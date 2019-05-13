@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Yhx4x2", "Yhx4x2\Yhx4x2.csproj", "{248D98B9-E715-4581-8A4C-357A9087725A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Yhx4x2.x86", "Yhx4x2.x86\Yhx4x2.x86.csproj", "{E8A7E293-E36B-44C2-90E1-0705FB2E2CDF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Yhx4x2.x64", "Yhx4x2.x64\Yhx4x2.x64.csproj", "{2BD47C29-D8AF-49EA-BC82-B8139BB1486F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{248D98B9-E715-4581-8A4C-357A9087725A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{248D98B9-E715-4581-8A4C-357A9087725A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{248D98B9-E715-4581-8A4C-357A9087725A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{248D98B9-E715-4581-8A4C-357A9087725A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8A7E293-E36B-44C2-90E1-0705FB2E2CDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8A7E293-E36B-44C2-90E1-0705FB2E2CDF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8A7E293-E36B-44C2-90E1-0705FB2E2CDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8A7E293-E36B-44C2-90E1-0705FB2E2CDF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2BD47C29-D8AF-49EA-BC82-B8139BB1486F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2BD47C29-D8AF-49EA-BC82-B8139BB1486F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2BD47C29-D8AF-49EA-BC82-B8139BB1486F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2BD47C29-D8AF-49EA-BC82-B8139BB1486F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
