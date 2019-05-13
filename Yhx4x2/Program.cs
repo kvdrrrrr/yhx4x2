@@ -207,28 +207,18 @@ namespace Yhx4x2
 
                 if (options.ScramblePE)
                 {
-                    switch (injector.RandomiseDllHeaders())
-                    {
-                        case true:
-                            Console.WriteLine("Scrambled headers.");
-                            break;
-                        case false:
-                            Console.Error.WriteLine("Failed to scramble headers.");
-                            break;
-                    }
+                    if (injector.RandomiseDllHeaders())
+                        Console.WriteLine("Scrambled headers.");
+                    else
+                        Console.Error.WriteLine("Failed to scramble headers.");
                 }
 
                 if (options.HideFromPeb)
                 {
-                    switch (injector.HideDllFromPeb())
-                    {
-                        case true:
-                            Console.WriteLine("Hidden from peb.");
-                            break;
-                        case false:
-                            Console.Error.WriteLine("Failed to hide from peb.");
-                            break;
-                    }
+                    if (injector.HideDllFromPeb())
+                        Console.WriteLine("Hidden from peb.");
+                    else
+                        Console.Error.WriteLine("Failed to hide from peb.");
                 }
             }
         }
