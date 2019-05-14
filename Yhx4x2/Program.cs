@@ -19,6 +19,8 @@ namespace Yhx4x2
 
         public static void Main(string[] args)
         {
+            var launchedByProtocol = false;
+            
             List<string> newArgs;
             if (args.Length == 1 && args[0].StartsWith("yhx4://"))
             {
@@ -27,6 +29,8 @@ namespace Yhx4x2
                 var decoded = WebUtility.UrlDecode(args[0].Substring(7, args[0].Length - 7)).Split(' ');
 
                 newArgs.AddRange(decoded);
+
+                launchedByProtocol = true;
             }
             else
             {
@@ -103,6 +107,11 @@ namespace Yhx4x2
 
             result.WithParsed<RegisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Register));
             result.WithParsed<UnregisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Unregister));
+
+            if (launchedByProtocol)
+            {
+                Console.ReadLine();
+            }
         }
 
         private static void StartProcessing(InjectOptions injectOptions)
