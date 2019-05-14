@@ -14,6 +14,20 @@ namespace Yhx4x2
     {
         public static void Main(string[] args)
         {
+            List<string> newArgs;
+            if (args.Length == 1 && args[0].StartsWith("yhx4://"))
+            {
+                newArgs = new List<string> {"inject"};
+
+                var decoded = WebUtility.UrlDecode(args[0].Substring(7, args[0].Length - 7)).Split(' ');
+                
+                newArgs.AddRange(decoded);
+            }
+            else
+            {
+                newArgs = new List<string>(args);
+            }
+
             void Configuration(ParserSettings with)
             {
                 with.EnableDashDash = true;
@@ -24,29 +38,48 @@ namespace Yhx4x2
                 with.IgnoreUnknownArguments = true;
             }
 
+            void ParseErrors<T>(ParserResult<T> resultArg)
+            {
+                var helpText = HelpText.AutoBuild(resultArg, h => HelpText.DefaultParsingErrorsHandler(resultArg, h), e => e);
+                helpText.AddEnumValuesToHelpText = true;
+                helpText.AddDashesToOption = true;
+                helpText.Heading = "Yhx4x2 Injector";
+                helpText.Copyright = "aka bleak wrapper by kvdr 2019";
+                helpText.AutoVersion = false;
+                Console.Error.WriteLine(helpText);
+            }
+
             var parser = new Parser(Configuration);
 
-            var result = parser.ParseArguments<Options>(args);
-            
-            result
-                .WithParsed(StartProcessing)
-                .WithNotParsed(errors => {                        
-                    var helpText = HelpText.AutoBuild(result, h => HelpText.DefaultParsingErrorsHandler(result, h), e => e);
-                    helpText.AddEnumValuesToHelpText = true;
-                    helpText.AddDashesToOption = true;
-                    helpText.Heading = "Yhx4x2 Injector";
-                    helpText.Copyright = "aka bleak wrapper by kvdr 2019";
-                    Console.Error.WriteLine(helpText);
+            var result = parser.ParseArguments<RegisterOptions, UnregisterOptions>(newArgs);
+
+            result.WithNotParsed(errors =>
+            {
+                if (errors.Any(error =>
+                    error.Tag == ErrorType.NoVerbSelectedError || error.Tag == ErrorType.BadVerbSelectedError))
+                {
+                    var result2 = parser.ParseArguments<InjectOptions>(newArgs);
                     
-                });
+                    result2
+                        .WithParsed(StartProcessing)
+                        .WithNotParsed(x => ParseErrors(result2));
+                }
+                else
+                {
+                    ParseErrors(result);
+                }
+            });
+
+            result.WithParsed<RegisterOptions>(_ => Yhx4Protocol.Register());
+            result.WithParsed<UnregisterOptions>(_ => Yhx4Protocol.Unregister());
         }
         
-        private static void StartProcessing(Options options)
+        private static void StartProcessing(InjectOptions injectOptions)
         {
             Process targetProcess;
             
             // PID
-            if (int.TryParse(options.TargetProcess, out var pid))
+            if (int.TryParse(injectOptions.TargetProcess, out var pid))
             {
                 try
                 {
@@ -54,14 +87,14 @@ namespace Yhx4x2
                 }
                 catch (ArgumentException)
                 {
-                    Console.Error.WriteLine($"Invalid target process {options.TargetProcess}: not running.");
+                    Console.Error.WriteLine($"Invalid target process {injectOptions.TargetProcess}: not running.");
                     return;
                 }
             }
             // Process name
             else
             {
-                var processName = options.TargetProcess;
+                var processName = injectOptions.TargetProcess;
                 // Get rid of extension
                 if (processName.Contains("."))
                     processName = processName.Split('.')[0];
@@ -71,7 +104,7 @@ namespace Yhx4x2
 
                 if (processes.Length != 1)
                 {
-                    Console.Error.WriteLine($"Invalid target process {options.TargetProcess}: not running or multiple instances are running.");
+                    Console.Error.WriteLine($"Invalid target process {injectOptions.TargetProcess}: not running or multiple instances are running.");
                     return;
                 }
 
@@ -80,7 +113,7 @@ namespace Yhx4x2
             
             var dllsDataToInject = new List<string>();
 
-            foreach (var dllFile in options.DllFiles)
+            foreach (var dllFile in injectOptions.DllFiles)
             {
                 var t = dllFile;
                 
@@ -201,11 +234,11 @@ namespace Yhx4x2
             // Inject stuff
             foreach (var dllData in dllsDataToInject)
             {
-                var injector = new Bleak.Injector(options.InjectionMethod, targetProcess.Id, dllData, options.RandomiseDllName);
+                var injector = new Bleak.Injector(injectOptions.InjectionMethod, targetProcess.Id, dllData, injectOptions.RandomiseDllName);
                 var baseAddr = injector.InjectDll();
                 Console.WriteLine($"Injected {Path.GetFileName(dllData)} @ {baseAddr.ToInt64():X16}.");
 
-                if (options.ScramblePE)
+                if (injectOptions.ScramblePE)
                 {
                     if (injector.RandomiseDllHeaders())
                         Console.WriteLine("Scrambled headers.");
@@ -213,7 +246,7 @@ namespace Yhx4x2
                         Console.Error.WriteLine("Failed to scramble headers.");
                 }
 
-                if (options.HideFromPeb)
+                if (injectOptions.HideFromPeb)
                 {
                     if (injector.HideDllFromPeb())
                         Console.WriteLine("Hidden from peb.");
