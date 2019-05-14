@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Security.Principal;
 using CommandLine;
 using CommandLine.Text;
 
@@ -12,6 +13,10 @@ namespace Yhx4x2
 {
     internal static class Program
     {
+        private static bool IsAdministrator =>
+            new WindowsPrincipal(WindowsIdentity.GetCurrent())
+                .IsInRole(WindowsBuiltInRole.Administrator);
+
         public static void Main(string[] args)
         {
             List<string> newArgs;
@@ -20,7 +25,7 @@ namespace Yhx4x2
                 newArgs = new List<string> {"inject"};
 
                 var decoded = WebUtility.UrlDecode(args[0].Substring(7, args[0].Length - 7)).Split(' ');
-                
+
                 newArgs.AddRange(decoded);
             }
             else
@@ -40,7 +45,8 @@ namespace Yhx4x2
 
             void ParseErrors<T>(ParserResult<T> resultArg)
             {
-                var helpText = HelpText.AutoBuild(resultArg, h => HelpText.DefaultParsingErrorsHandler(resultArg, h), e => e);
+                var helpText = HelpText.AutoBuild(resultArg, h => HelpText.DefaultParsingErrorsHandler(resultArg, h),
+                    e => e);
                 helpText.AddEnumValuesToHelpText = true;
                 helpText.AddDashesToOption = true;
                 helpText.Heading = "Yhx4x2 Injector";
@@ -59,7 +65,7 @@ namespace Yhx4x2
                     error.Tag == ErrorType.NoVerbSelectedError || error.Tag == ErrorType.BadVerbSelectedError))
                 {
                     var result2 = parser.ParseArguments<InjectOptions>(newArgs);
-                    
+
                     result2
                         .WithParsed(StartProcessing)
                         .WithNotParsed(x => ParseErrors(result2));
@@ -70,14 +76,39 @@ namespace Yhx4x2
                 }
             });
 
-            result.WithParsed<RegisterOptions>(_ => Yhx4Protocol.Register());
-            result.WithParsed<UnregisterOptions>(_ => Yhx4Protocol.Unregister());
+            void PerformEscalatedAction(Action action)
+            {
+                if (IsAdministrator)
+                {
+                    action();
+                }
+                else
+                {
+                    var startInfo = new ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location)
+                    {
+                        Verb = "runas", 
+                        Arguments = string.Join(" ", newArgs),
+                        UseShellExecute = true
+                    };
+
+                    var process = new Process
+                    {
+                        StartInfo = startInfo
+                    };
+
+                    process.Start();
+                    process.WaitForExit();
+                }
+            }
+
+            result.WithParsed<RegisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Register));
+            result.WithParsed<UnregisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Unregister));
         }
-        
+
         private static void StartProcessing(InjectOptions injectOptions)
         {
             Process targetProcess;
-            
+
             // PID
             if (int.TryParse(injectOptions.TargetProcess, out var pid))
             {
@@ -98,32 +129,33 @@ namespace Yhx4x2
                 // Get rid of extension
                 if (processName.Contains("."))
                     processName = processName.Split('.')[0];
-                
+
 
                 var processes = Process.GetProcessesByName(processName);
 
                 if (processes.Length != 1)
                 {
-                    Console.Error.WriteLine($"Invalid target process {injectOptions.TargetProcess}: not running or multiple instances are running.");
+                    Console.Error.WriteLine(
+                        $"Invalid target process {injectOptions.TargetProcess}: not running or multiple instances are running.");
                     return;
                 }
 
                 targetProcess = processes[0];
             }
-            
+
             var dllsDataToInject = new List<string>();
 
             foreach (var dllFile in injectOptions.DllFiles)
             {
                 var t = dllFile;
-                
+
                 string relFileName = null;
                 if (dllFile.StartsWith("[["))
                 {
                     var idx = dllFile.IndexOf("]]", 2, StringComparison.OrdinalIgnoreCase);
                     relFileName = dllFile.Substring(2, idx - 2);
                     t = dllFile.Substring(4 + relFileName.Length, dllFile.Length - 4 - relFileName.Length);
-                    
+
                     Console.WriteLine($"Local temp file forced to: {relFileName}");
                 }
 
@@ -132,15 +164,15 @@ namespace Yhx4x2
                     (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps))
                 {
                     Console.WriteLine($"Downloading DLL from: {t}");
-                    
+
                     Directory.CreateDirectory("temp");
 
-                    var fileRequest = (HttpWebRequest)WebRequest.Create(uriResult);    
+                    var fileRequest = (HttpWebRequest) WebRequest.Create(uriResult);
                     fileRequest.MaximumAutomaticRedirections = 3;
                     fileRequest.AllowAutoRedirect = true;
                     fileRequest.CookieContainer = new CookieContainer();
                     fileRequest.Method = "GET";
-                    
+
                     var split = uriResult.UserInfo.Split(':');
                     if (split.Length > 1)
                     {
@@ -154,21 +186,21 @@ namespace Yhx4x2
                         fileRequest.Credentials = credCache;
                         fileRequest.PreAuthenticate = true;
                     }
-                    
-                    var fileResponse = (HttpWebResponse)fileRequest.GetResponse();
-                    
+
+                    var fileResponse = (HttpWebResponse) fileRequest.GetResponse();
+
                     using (var rs = fileResponse.GetResponseStream())
                     using (var ms = new MemoryStream())
                     {
                         // read response into memory
                         rs.CopyTo(ms);
-                        
+
                         ms.Position = 0;
 
                         // are we dealing with a gzip file?
                         var gzip = false;
                         var sr = new BinaryReader(ms);
-                        var gzipHeader = new byte[] { 0x1F, 0x8B, 0x08 };
+                        var gzipHeader = new byte[] {0x1F, 0x8B, 0x08};
                         var header = sr.ReadBytes(3);
 
                         if (header.SequenceEqual(gzipHeader))
@@ -176,7 +208,7 @@ namespace Yhx4x2
                             Console.WriteLine("Decompressing...");
                             gzip = true;
                         }
-                        
+
                         ms.Position = 0;
 
                         MemoryStream targetStream;
@@ -202,16 +234,16 @@ namespace Yhx4x2
                         }
 
                         targetStream.Position = 0;
-                        
+
                         var fileName = Path.GetFullPath(Path.Combine("temp", relFileName));
 
                         using (var fs = File.OpenWrite(fileName))
                         {
                             targetStream.CopyTo(fs);
                         }
-                        
+
                         dllsDataToInject.Add(fileName);
-                        
+
                         targetStream.Flush();
                         targetStream.Dispose();
                     }
@@ -226,7 +258,7 @@ namespace Yhx4x2
                         Console.Error.WriteLine($"Specified DLL file does not exist: {dllFile}.");
                         return;
                     }
-                    
+
                     dllsDataToInject.Add(fullPath);
                 }
             }
@@ -234,7 +266,8 @@ namespace Yhx4x2
             // Inject stuff
             foreach (var dllData in dllsDataToInject)
             {
-                var injector = new Bleak.Injector(injectOptions.InjectionMethod, targetProcess.Id, dllData, injectOptions.RandomiseDllName);
+                var injector = new Bleak.Injector(injectOptions.InjectionMethod, targetProcess.Id, dllData,
+                    injectOptions.RandomiseDllName);
                 var baseAddr = injector.InjectDll();
                 Console.WriteLine($"Injected {Path.GetFileName(dllData)} @ {baseAddr.ToInt64():X16}.");
 
