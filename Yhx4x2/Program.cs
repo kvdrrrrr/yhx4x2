@@ -56,6 +56,7 @@ namespace Yhx4x2
                 helpText.Heading = "Yhx4x2 Injector";
                 helpText.Copyright = "aka bleak wrapper by kvdr 2019";
                 helpText.AutoVersion = false;
+                helpText.AddOptions(resultArg);
                 Console.Error.WriteLine(helpText);
             }
 
