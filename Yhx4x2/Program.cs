@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using CommandLine;
 using CommandLine.Text;
@@ -36,7 +37,7 @@ namespace Yhx4x2
             {
                 newArgs = new List<string>(args);
             }
-
+            
             void Configuration(ParserSettings with)
             {
                 with.EnableDashDash = true;
@@ -72,7 +73,7 @@ namespace Yhx4x2
                     var result2 = parser.ParseArguments<InjectOptions>(newArgs);
 
                     result2
-                        .WithParsed(StartProcessing)
+                        .WithParsed(options => PerformEscalatedAction(() => StartProcessing(options, newArgs), newArgs))
                         .WithNotParsed(x => ParseErrors(result2));
                 }
                 else
@@ -81,33 +82,8 @@ namespace Yhx4x2
                 }
             });
 
-            void PerformEscalatedAction(Action action)
-            {
-                if (IsAdministrator)
-                {
-                    action();
-                }
-                else
-                {
-                    var startInfo = new ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location)
-                    {
-                        Verb = "runas", 
-                        Arguments = string.Join(" ", newArgs),
-                        UseShellExecute = true
-                    };
-
-                    var process = new Process
-                    {
-                        StartInfo = startInfo
-                    };
-
-                    process.Start();
-                    process.WaitForExit();
-                }
-            }
-
-            result.WithParsed<RegisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Register));
-            result.WithParsed<UnregisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Unregister));
+            result.WithParsed<RegisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Register, newArgs));
+            result.WithParsed<UnregisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Unregister, newArgs));
 
             if (launchedByProtocol)
             {
@@ -115,7 +91,7 @@ namespace Yhx4x2
             }
         }
 
-        private static void StartProcessing(InjectOptions injectOptions)
+        private static void StartProcessing(InjectOptions injectOptions, List<string> newArgs)
         {
             Process targetProcess;
 
@@ -175,8 +151,14 @@ namespace Yhx4x2
                 {
                     Console.WriteLine($"Downloading DLL from: {t}");
 
-                    Directory.CreateDirectory("temp");
+                    var result = Directory.CreateDirectory("temp");
 
+                    if (!CanRead(result.FullName))
+                    {
+                        Console.WriteLine("Failed to write to temporary directory.");
+                        return;
+                    }
+                    
                     var fileRequest = (HttpWebRequest) WebRequest.Create(uriResult);
                     fileRequest.MaximumAutomaticRedirections = 3;
                     fileRequest.AllowAutoRedirect = true;
@@ -298,5 +280,62 @@ namespace Yhx4x2
                 }
             }
         }
+        
+        private static void PerformEscalatedAction(Action action, List<string> newArgs)
+        {
+            if (IsAdministrator)
+            {
+                action();
+            }
+            else
+            {
+                var startInfo = new ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location)
+                {
+                    Verb = "runas", 
+                    Arguments = string.Join(" ", newArgs),
+                    UseShellExecute = true
+                };
+
+                var process = new Process
+                {
+                    StartInfo = startInfo
+                };
+
+                process.Start();
+                process.WaitForExit();
+            }
+        }
+
+        
+        private static bool CanRead(string directoryPath)
+        {
+            var readAllow = false;
+            var readDeny = false;
+            
+            var accessControlList = Directory.GetAccessControl(directoryPath);
+            var accessRules = accessControlList?.GetAccessRules(true, true, typeof(SecurityIdentifier));
+            
+            if(accessRules == null)
+                return false;
+
+            foreach (FileSystemAccessRule rule in accessRules)
+            {
+                if ((FileSystemRights.Read & rule.FileSystemRights) != FileSystemRights.Read) continue;
+
+                switch (rule.AccessControlType)
+                {
+                    case AccessControlType.Allow:
+                        readAllow = true;
+                        break;
+                    case AccessControlType.Deny:
+                        readDeny = true;
+                        break;
+                }
+            }
+
+            return readAllow && !readDeny;
+        }
     }
+    
+    
 }
