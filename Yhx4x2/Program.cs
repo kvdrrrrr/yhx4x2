@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Threading;
 using CommandLine;
 using CommandLine.Text;
 
@@ -87,7 +88,8 @@ namespace Yhx4x2
 
             if (launchedByProtocol)
             {
-                Console.ReadLine();
+                Console.WriteLine("Done, exiting in 5 seconds.");
+                Thread.Sleep(5000);
             }
         }
 
