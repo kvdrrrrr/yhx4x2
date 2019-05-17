@@ -27,7 +27,7 @@ namespace Yhx4x2
             {
                 newArgs = new List<string> {"inject"};
 
-                var decoded = WebUtility.UrlDecode(args[0].Substring(7, args[0].Length - 7)).Split(' ');
+                var decoded = WebUtility.UrlDecode(args[0].Substring(7)).Split(' ');
 
                 newArgs.AddRange(decoded);
 
@@ -140,7 +140,7 @@ namespace Yhx4x2
                 {
                     var idx = dllFile.IndexOf("]]", 2, StringComparison.OrdinalIgnoreCase);
                     relFileName = dllFile.Substring(2, idx - 2);
-                    t = dllFile.Substring(4 + relFileName.Length, dllFile.Length - 4 - relFileName.Length);
+                    t = dllFile.Substring(4 + relFileName.Length);
 
                     Console.WriteLine($"Local temp file forced to: {relFileName}");
                 }
