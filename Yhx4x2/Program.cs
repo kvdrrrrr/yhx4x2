@@ -74,7 +74,7 @@ namespace Yhx4x2
                     var result2 = parser.ParseArguments<InjectOptions>(newArgs);
 
                     result2
-                        .WithParsed(options => PerformEscalatedAction(() => StartProcessing(options, newArgs), newArgs))
+                        .WithParsed(options => PerformEscalatedAction(() => StartProcessing(options), newArgs))
                         .WithNotParsed(x => ParseErrors(result2));
                 }
                 else
@@ -93,7 +93,7 @@ namespace Yhx4x2
             }
         }
 
-        private static void StartProcessing(InjectOptions injectOptions, List<string> newArgs)
+        private static void StartProcessing(InjectOptions injectOptions)
         {
             Process targetProcess;
 
