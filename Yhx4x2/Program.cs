@@ -143,8 +143,6 @@ namespace Yhx4x2
                     var idx = dllFile.IndexOf("]]", 2, StringComparison.OrdinalIgnoreCase);
                     relFileName = dllFile.Substring(2, idx - 2);
                     t = dllFile.Substring(4 + relFileName.Length);
-
-                    Console.WriteLine($"Local temp file forced to: {relFileName}");
                 }
 
                 // URL, download & write to temp file
@@ -193,13 +191,20 @@ namespace Yhx4x2
 
                         // are we dealing with a gzip file?
                         var gzip = false;
+                        var zip = false;
                         var sr = new BinaryReader(ms);
                         var gzipHeader = new byte[] {0x1F, 0x8B, 0x08};
-                        var header = sr.ReadBytes(3);
+                        var zipHeader = new byte[] {0x50, 0x4B, 0x03, 0x04};
+                        var header = sr.ReadBytes(4);
 
-                        if (header.SequenceEqual(gzipHeader))
+                        if (header.SequenceEqual(zipHeader))
                         {
-                            Console.WriteLine("Decompressing...");
+                            Console.WriteLine("Decompressing ZIP...");
+                            zip = true;
+                        }
+                        else if (header.Take(3).SequenceEqual(gzipHeader))
+                        {
+                            Console.WriteLine("Decompressing GZIP...");
                             gzip = true;
                         }
 
@@ -215,6 +220,33 @@ namespace Yhx4x2
 
                             targetStream.Position = 0;
                         }
+                        else if (zip)
+                        {
+                            var zipArchive = new ZipArchive(ms, ZipArchiveMode.Read);
+
+                            var count = 0;
+                            
+                            foreach (var entry in zipArchive.Entries)
+                            {
+                                if (entry.FullName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var fileName1 = Path.GetFullPath(Path.Combine("temp", entry.Name));
+
+                                    using (var fs = File.OpenWrite(fileName1))
+                                    {
+                                        entry.Open().CopyTo(fs);
+                                    }
+
+                                    dllsDataToInject.Add(fileName1);
+                                    
+                                    count++;
+                                }
+                            }
+
+                            Console.WriteLine($"Decompressed {count} dll files.");
+                            
+                            return;
+                        }
                         else
                         {
                             targetStream = ms;
@@ -227,6 +259,8 @@ namespace Yhx4x2
                             relFileName += ".dll";
                         }
 
+                        Console.WriteLine($"Writing temp file to: {relFileName}");
+                        
                         targetStream.Position = 0;
 
                         var fileName = Path.GetFullPath(Path.Combine("temp", relFileName));
