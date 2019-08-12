@@ -1,7 +1,7 @@
 using System;
 using Microsoft.Win32;
 
-namespace Yhx4x2
+namespace Installer
 {
     internal static class Yhx4Protocol
     {
@@ -10,8 +10,7 @@ namespace Yhx4x2
         private const string CompanyName = "kvdr";
         private const string ProductName = "yhx4x2";
 
-        private static readonly string Launch =
-            $"\"{System.Reflection.Assembly.GetExecutingAssembly().Location}\" \"%1\"";
+        private static string Launch(string path) => $"\"{path}\" \"%1\"";
 
         private static readonly Version Win8Version = new Version(6, 2, 9200, 0);
 
@@ -19,15 +18,15 @@ namespace Yhx4x2
             Environment.OSVersion.Platform == PlatformID.Win32NT &&
             Environment.OSVersion.Version >= Win8Version;
 
-        public static void Register()
+        public static void Register(string path)
         {
             if (IsWin8)
-                RegisterWin8();
+                RegisterWin8(path);
             else
-                RegisterWin7();
+                RegisterWin7(path);
         }
 
-        private static void RegisterWin7()
+        private static void RegisterWin7(string path)
         {
             var regKey = Registry.ClassesRoot.CreateSubKey(Protocol);
 
@@ -37,19 +36,19 @@ namespace Yhx4x2
                 regKey.SetValue("URL Protocol", "");
 
                 regKey = regKey.CreateSubKey(@"shell\open\command");
-                regKey.SetValue(null, Launch);
+                regKey.SetValue(null, Launch(path));
             }
         }
 
-        private static void RegisterWin8()
+        private static void RegisterWin8(string path)
         {
-            RegisterWin7();
+            RegisterWin7(path);
 
             var regKey = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Classes")?.CreateSubKey(ProtocolHandler);
 
             regKey?.SetValue(null, Protocol);
 
-            regKey?.CreateSubKey(@"shell\open\command")?.SetValue(null, Launch);
+            regKey?.CreateSubKey(@"shell\open\command")?.SetValue(null, Launch(path));
 
             Registry.LocalMachine
                 .CreateSubKey(

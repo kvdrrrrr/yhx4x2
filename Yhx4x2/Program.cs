@@ -5,8 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net;
-using System.Security.AccessControl;
-using System.Security.Principal;
+using System.Runtime.InteropServices;
 using System.Threading;
 using CommandLine;
 using CommandLine.Text;
@@ -15,10 +14,6 @@ namespace Yhx4x2
 {
     internal static class Program
     {
-        private static bool IsAdministrator =>
-            new WindowsPrincipal(WindowsIdentity.GetCurrent())
-                .IsInRole(WindowsBuiltInRole.Administrator);
-
         public static void Main(string[] args)
         {
             var launchedByProtocol = false;
@@ -64,27 +59,12 @@ namespace Yhx4x2
 
             var parser = new Parser(Configuration);
 
-            var result = parser.ParseArguments<RegisterOptions, UnregisterOptions>(newArgs);
+            var result = parser.ParseArguments<InjectOptions>(newArgs);
 
-            result.WithNotParsed(errors =>
-            {
-                if (errors.Any(error =>
-                    error.Tag == ErrorType.NoVerbSelectedError || error.Tag == ErrorType.BadVerbSelectedError))
-                {
-                    var result2 = parser.ParseArguments<InjectOptions>(newArgs);
+            result
+                .WithParsed(options => PerformEscalatedAction(() => StartProcessing(options), newArgs))
+                .WithNotParsed(x => ParseErrors(result));
 
-                    result2
-                        .WithParsed(options => PerformEscalatedAction(() => StartProcessing(options), newArgs))
-                        .WithNotParsed(x => ParseErrors(result2));
-                }
-                else
-                {
-                    ParseErrors(result);
-                }
-            });
-
-            result.WithParsed<RegisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Register, newArgs));
-            result.WithParsed<UnregisterOptions>(_ => PerformEscalatedAction(Yhx4Protocol.Unregister, newArgs));
 
             if (launchedByProtocol)
             {
@@ -153,7 +133,7 @@ namespace Yhx4x2
 
                     var result = Directory.CreateDirectory("temp");
 
-                    if (!CanRead(result.FullName))
+                    if (!result.Exists)
                     {
                         Console.WriteLine("Failed to write to temporary directory.");
                         return;
@@ -294,38 +274,45 @@ namespace Yhx4x2
             // Inject stuff
             foreach (var dllData in dllsDataToInject)
             {
-                var injector = new Bleak.Injector(injectOptions.InjectionMethod, targetProcess.Id, dllData,
-                    injectOptions.RandomiseDllName);
-                var baseAddr = injector.InjectDll();
-                Console.WriteLine($"Injected {Path.GetFileName(dllData)} @ {baseAddr.ToInt64():X16}.");
+                //injectOptions.InjectionMethod, targetProcess.Id, dllData, injectOptions.RandomiseDllName
+
+                var injflags = Bleak.InjectionFlags.None;
 
                 if (injectOptions.ScramblePE)
                 {
-                    if (injector.RandomiseDllHeaders())
-                        Console.WriteLine("Scrambled headers.");
-                    else
-                        Console.Error.WriteLine("Failed to scramble headers.");
+                    injflags |= Bleak.InjectionFlags.RandomiseDllHeaders;
                 }
 
                 if (injectOptions.HideFromPeb)
                 {
-                    if (injector.HideDllFromPeb())
-                        Console.WriteLine("Hidden from peb.");
-                    else
-                        Console.Error.WriteLine("Failed to hide from peb.");
+                    injflags |= Bleak.InjectionFlags.HideDllFromPeb;
                 }
+
+                if (injectOptions.RandomiseDllName)
+                {
+                    injflags |= Bleak.InjectionFlags.RandomiseDllName;
+                }
+
+                var injector = new Bleak.Injector(targetProcess.Id, dllData, injectOptions.InjectionMethod, injflags);
+
+                var baseAddr = injector.InjectDll();
+                Console.WriteLine($"Injected {Path.GetFileName(dllData)} @ {baseAddr.ToInt64():X16}.");
             }
         }
-        
+
+        [DllImport("shell32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool IsUserAnAdmin();
+
         private static void PerformEscalatedAction(Action action, List<string> newArgs)
         {
-            if (IsAdministrator)
+            if (IsUserAnAdmin())
             {
                 action();
             }
             else
             {
-                var startInfo = new ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location)
+                var startInfo = new ProcessStartInfo(System.Reflection.Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe"))
                 {
                     Verb = "runas", 
                     Arguments = string.Join(" ", newArgs),
@@ -341,37 +328,5 @@ namespace Yhx4x2
                 process.WaitForExit();
             }
         }
-
-        
-        private static bool CanRead(string directoryPath)
-        {
-            var readAllow = false;
-            var readDeny = false;
-            
-            var accessControlList = Directory.GetAccessControl(directoryPath);
-            var accessRules = accessControlList?.GetAccessRules(true, true, typeof(SecurityIdentifier));
-            
-            if(accessRules == null)
-                return false;
-
-            foreach (FileSystemAccessRule rule in accessRules)
-            {
-                if ((FileSystemRights.Read & rule.FileSystemRights) != FileSystemRights.Read) continue;
-
-                switch (rule.AccessControlType)
-                {
-                    case AccessControlType.Allow:
-                        readAllow = true;
-                        break;
-                    case AccessControlType.Deny:
-                        readDeny = true;
-                        break;
-                }
-            }
-
-            return readAllow && !readDeny;
-        }
     }
-    
-    
 }

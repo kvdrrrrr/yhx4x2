@@ -4,7 +4,6 @@ using CommandLine;
 
 namespace Yhx4x2
 {
-    [Verb("inject", HelpText = "", Hidden = true)]
     internal class InjectOptions
     {
         public InjectOptions(IEnumerable<string> dllFiles, string targetProcess, InjectionMethod injectionMethod, bool randomiseDllName, bool scramblePe, bool hideFromPeb)
@@ -34,17 +33,5 @@ namespace Yhx4x2
         
         [Option(longName: "hidePEB", Required = false, HelpText = "Hide injected DLL from PEB.")]
         public bool HideFromPeb { get; }
-    }
-
-    [Verb("register", HelpText = "Register yhx4:// protocol")]
-    internal class RegisterOptions
-    {
-        
-    }
-
-    [Verb("unregister", HelpText = "Unregister yhx4:// protocol")]
-    internal class UnregisterOptions
-    {
-        
     }
 }
